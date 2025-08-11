@@ -18,6 +18,7 @@ class _AddSessionSheetState extends State<AddSessionSheet> {
   DateTime _dateTime = DateTime.now();
   final TextEditingController _minutesCtrl = TextEditingController();
   GameMood _mood = GameMood.neutral;
+  GameCategory _category = GameCategory.other;
   final TextEditingController _notesCtrl = TextEditingController();
   TimeOfDay? _reminderTime;
 
@@ -75,6 +76,33 @@ class _AddSessionSheetState extends State<AddSessionSheet> {
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.done,
                 decoration: const InputDecoration(hintText: 'e.g. 45'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _Field(
+              label: 'Game Category',
+              child: DropdownButtonFormField<GameCategory>(
+                value: _category,
+                decoration: const InputDecoration(
+                  hintText: 'Select category',
+                ),
+                items: GameCategory.values.map((category) {
+                  return DropdownMenuItem(
+                    value: category,
+                    child: Row(
+                      children: [
+                        Icon(_getCategoryIcon(category)),
+                        const SizedBox(width: 8),
+                        Text(_getCategoryName(category)),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _category = value);
+                  }
+                },
               ),
             ),
             const SizedBox(height: 12),
@@ -231,11 +259,54 @@ class _AddSessionSheetState extends State<AddSessionSheet> {
       startedAt: _dateTime,
       minutes: minutes,
       mood: _mood,
+      gameCategory: _category,
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
     );
     await context.read<SessionProvider>().addSession(session);
     if (!mounted) return;
     Navigator.of(context).pop();
+  }
+
+  IconData _getCategoryIcon(GameCategory category) {
+    switch (category) {
+      case GameCategory.action:
+        return Icons.flash_on;
+      case GameCategory.adventure:
+        return Icons.explore;
+      case GameCategory.strategy:
+        return Icons.psychology;
+      case GameCategory.rpg:
+        return Icons.person;
+      case GameCategory.sports:
+        return Icons.sports_soccer;
+      case GameCategory.puzzle:
+        return Icons.extension;
+      case GameCategory.simulation:
+        return Icons.sim_card;
+      case GameCategory.other:
+        return Icons.games;
+    }
+  }
+
+  String _getCategoryName(GameCategory category) {
+    switch (category) {
+      case GameCategory.action:
+        return 'Action';
+      case GameCategory.adventure:
+        return 'Adventure';
+      case GameCategory.strategy:
+        return 'Strategy';
+      case GameCategory.rpg:
+        return 'RPG';
+      case GameCategory.sports:
+        return 'Sports';
+      case GameCategory.puzzle:
+        return 'Puzzle';
+      case GameCategory.simulation:
+        return 'Simulation';
+      case GameCategory.other:
+        return 'Other';
+    }
   }
 }
 

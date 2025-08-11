@@ -1,4 +1,4 @@
-package com.example.wunder_ios_83
+package com.wunde.rino
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import '../../../../core/models/game_session.dart';
 import '../../../sessions/providers/session_provider.dart';
 import '../widgets/add_session_sheet.dart';
+import '../../../achievements/ui/screens/achievements_screen.dart';
+import '../../../statistics/ui/screens/statistics_screen.dart';
+import '../../../games/ui/screens/games_library_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -19,6 +22,8 @@ class HomeScreen extends StatelessWidget {
           children: [
             const _Header(),
             const SizedBox(height: 8),
+            const _QuickActionsRow(),
+            const SizedBox(height: 12),
             const _AdviceCard(),
             const SizedBox(height: 12),
             const _ActivityChartCard(),
@@ -130,7 +135,7 @@ class _AdviceCard extends StatelessWidget {
                 child: Text(
                   'Tip: Take 5-minute breaks every hour to keep your play healthy.',
                   style: Theme.of(context).textTheme.bodyMedium,
-                  maxLines: 3,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -148,24 +153,44 @@ class _ActivityChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = context.watch<SessionProvider>().minutesPerDayLast14Days();
+    final sortedEntries = data.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
     final List<BarChartGroupData> bars = [];
-    int index = 0;
-    for (final entry in data.entries) {
+
+    for (int i = 0; i < sortedEntries.length; i++) {
+      final entry = sortedEntries[i];
       bars.add(
         BarChartGroupData(
-          x: index,
+          x: i,
           barRods: [
             BarChartRodData(
               toY: entry.value.toDouble(),
-              color: const Color(0xFF2CC9FF),
-              width: 10,
-              borderRadius: BorderRadius.circular(4),
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  Theme.of(context).colorScheme.secondary.withOpacity(0.7),
+                  Theme.of(context).colorScheme.secondary,
+                ],
+              ),
+              width: 12,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(4),
+                topRight: Radius.circular(4),
+              ),
             ),
           ],
         ),
       );
-      index++;
     }
+
+    final maxValue = sortedEntries.isEmpty
+        ? 0.0
+        : sortedEntries
+              .map((e) => e.value)
+              .reduce((a, b) => a > b ? a : b)
+              .toDouble();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -184,8 +209,29 @@ class _ActivityChartCard extends StatelessWidget {
                 height: 180,
                 child: BarChart(
                   BarChartData(
-                    gridData: const FlGridData(show: false),
-                    borderData: FlBorderData(show: false),
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: maxValue > 0 ? maxValue * 1.2 : 100,
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: maxValue > 0 ? maxValue / 3 : 30,
+                      getDrawingHorizontalLine: (value) {
+                        return FlLine(
+                          color: Colors.grey.withOpacity(0.2),
+                          strokeWidth: 1,
+                          dashArray: [3, 3],
+                        );
+                      },
+                    ),
+                    borderData: FlBorderData(
+                      show: true,
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.grey.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                    ),
                     titlesData: FlTitlesData(
                       rightTitles: const AxisTitles(
                         sideTitles: SideTitles(showTitles: false),
@@ -197,25 +243,49 @@ class _ActivityChartCard extends StatelessWidget {
                         sideTitles: SideTitles(
                           showTitles: true,
                           reservedSize: 28,
-                          getTitlesWidget: (v, meta) => Text(
-                            v.toInt().toString(),
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
+                          interval: maxValue > 0 ? maxValue / 3 : 30,
+                          getTitlesWidget: (v, meta) {
+                            if (v == 0) return const SizedBox.shrink();
+                            return Text(
+                              v.toInt().toString(),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: Colors.grey, fontSize: 10),
+                            );
+                          },
                         ),
                       ),
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
+                          reservedSize: 25,
                           getTitlesWidget: (v, meta) {
                             final int i = v.toInt();
-                            if (i < 0 || i >= data.length)
+                            if (i < 0 || i >= sortedEntries.length) {
                               return const SizedBox.shrink();
-                            final DateTime day = data.keys.elementAt(i);
+                            }
+                            final DateTime day = sortedEntries[i].key;
+                            final now = DateTime.now();
+                            final isToday =
+                                day.day == now.day &&
+                                day.month == now.month &&
+                                day.year == now.year;
+
                             return Padding(
-                              padding: const EdgeInsets.only(top: 6.0),
+                              padding: const EdgeInsets.only(top: 4.0),
                               child: Text(
-                                DateFormat('E').format(day),
-                                style: Theme.of(context).textTheme.labelSmall,
+                                DateFormat('E').format(day).substring(0, 2),
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: isToday
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.secondary
+                                          : Colors.grey,
+                                      fontWeight: isToday
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      fontSize: 10,
+                                    ),
                               ),
                             );
                           },
@@ -223,8 +293,152 @@ class _ActivityChartCard extends StatelessWidget {
                       ),
                     ),
                     barGroups: bars,
+                    barTouchData: BarTouchData(
+                      enabled: true,
+                      touchTooltipData: BarTouchTooltipData(
+                        getTooltipColor: (group) => Theme.of(
+                          context,
+                        ).colorScheme.surface.withOpacity(0.9),
+                        tooltipBorder: BorderSide(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.outline.withOpacity(0.3),
+                        ),
+                        tooltipRoundedRadius: 6,
+                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                          if (groupIndex >= 0 &&
+                              groupIndex < sortedEntries.length) {
+                            final entry = sortedEntries[groupIndex];
+                            final dayName = DateFormat('EEE').format(entry.key);
+                            final dateStr = DateFormat(
+                              'MMM d',
+                            ).format(entry.key);
+                            return BarTooltipItem(
+                              '$dayName\n$dateStr\n${entry.value} min',
+                              TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 12,
+                              ),
+                            );
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
                   ),
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionsRow extends StatelessWidget {
+  const _QuickActionsRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: _QuickActionCard(
+              icon: Icons.emoji_events,
+              title: 'Achievements',
+              subtitle: 'Your rewards',
+              color: Colors.amber,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AchievementsScreen(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _QuickActionCard(
+              icon: Icons.analytics,
+              title: 'Statistics',
+              subtitle: 'Detailed analysis',
+              color: Colors.blue,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const StatisticsScreen(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _QuickActionCard(
+              icon: Icons.library_books,
+              title: 'Library',
+              subtitle: 'Your games',
+              color: Colors.green,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GamesLibraryScreen(),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          child: Column(
+            children: [
+              Icon(icon, size: 28, color: color),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodySmall,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -271,8 +485,14 @@ class _SessionList extends StatelessWidget {
             child: ListTile(
               title: Text(
                 '${DateFormat('MMM d, HH:mm').format(s.startedAt)} • ${s.minutes} min',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              subtitle: Text(_moodLabel(s.mood)),
+              subtitle: Text(
+                _moodLabel(s.mood),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               leading: _moodIcon(s.mood),
             ),
           ),

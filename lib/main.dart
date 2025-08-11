@@ -6,7 +6,11 @@ import 'package:provider/provider.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
 import 'src/core/models/game_session.dart';
+import 'src/core/models/user_settings.dart';
+import 'src/core/models/game.dart';
 import 'src/core/services/notification_service.dart';
+import 'src/core/services/achievement_service.dart';
+import 'src/core/services/settings_service.dart';
 import 'src/features/sessions/providers/session_provider.dart';
 import 'src/features/sessions/ui/screens/home_screen.dart';
 
@@ -15,8 +19,18 @@ Future<void> main() async {
   tz.initializeTimeZones();
   await Hive.initFlutter();
   Hive.registerAdapter(GameMoodAdapter());
+  Hive.registerAdapter(GameCategoryAdapter());
+  Hive.registerAdapter(AchievementAdapter());
   Hive.registerAdapter(GameSessionAdapter());
+  Hive.registerAdapter(UserSettingsAdapter());
+  Hive.registerAdapter(GameAdapter());
+
   await Hive.openBox<GameSession>(HiveBoxes.sessions);
+  await Hive.openBox<Game>(GameBoxes.games);
+
+  // Инициализируем сервисы
+  await AchievementService().initialize();
+  await SettingsService().initialize();
 
   await NotificationService.instance.initialize(
     const AndroidInitializationSettings('@mipmap/ic_launcher'),
